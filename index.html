@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Aesthetic Engine · Cloud Sync</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root {
+            --burgundy: #6B2737; --gold: #C4935A; --paper: #F7F3EE; --ink: #1A1410;
+            --r: 12px; --shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); line-height: 1.6; }
+        
+        /* Layout */
+        .hdr { background: var(--burgundy); color: #fff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--gold); }
+        .hdr-logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; letter-spacing: 2px; }
+        
+        .tabs { display: flex; background: #EFE9DF; padding: 0 20px; border-bottom: 1px solid #D1C7B7; }
+        .tab { padding: 15px 20px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: #8A7A6A; border-bottom: 3px solid transparent; }
+        .tab.active { color: var(--burgundy); border-bottom-color: var(--burgundy); }
+
+        .page { display: none; padding: 30px; max-width: 1000px; margin: 0 auto; }
+        .page.active { display: block; }
+
+        /* Components */
+        .card { background: #fff; border-radius: var(--r); padding: 25px; box-shadow: var(--shadow); margin-bottom: 20px; border: 1px solid #E5DDD0; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .frow { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8A7A6A; }
+        input, select { padding: 10px; border: 1px solid #E5DDD0; border-radius: 8px; font-size: 14px; }
+        
+        .btn { padding: 12px 25px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-primary { background: var(--burgundy); color: #fff; }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-ghost { background: #EFE9DF; color: var(--ink); }
+
+        /* Client List */
+        .client-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+        .client-card { background: #fff; padding: 20px; border-radius: var(--r); border: 1px solid #E5DDD0; position: relative; cursor: pointer; }
+        .client-card:hover { border-color: var(--gold); }
+        .cc-name { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--burgundy); }
+        .cc-del { position: absolute; top: 10px; right: 10px; cursor: pointer; color: #C0A0A0; }
+
+        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="hdr">
+    <div class="hdr-logo">✦ AESTHETIC ENGINE</div>
+    <div>
+        <button class="btn btn-ghost" onclick="showPage('clients')">Database</button>
+        <button class="btn btn-primary" onclick="showPage('main')">New Analysis</button>
+    </div>
+</div>
+
+<nav class="tabs" id="nav-tabs">
+    <button class="tab active" onclick="switchTab('profile')">1. Profile</button>
+    <button class="tab" onclick="switchTab('measures')">2. Measures</button>
+</nav>
+
+<div id="page-main" class="page active">
+    <div id="tab-profile" class="tab-content">
+        <div class="card">
+            <h3 style="margin-bottom:15px">Client Profile</h3>
+            <div class="form-grid">
+                <div class="frow">
+                    <label>Full Name</label>
+                    <input type="text" id="c_name" placeholder="Name - Surname">
+                </div>
+                <div class="frow">
+                    <label>Age</label>
+                    <input type="number" id="c_age">
+                </div>
+                <div class="frow">
+                    <label>Gender</label>
+                    <select id="c_gender">
+                        <option value="Female">Female</option>
+                        <option value="Male">Male</option>
+                    </select>
+                </div>
+                <div class="frow">
+                    <label>Consultation Date</label>
+                    <input type="date" id="c_date">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-measures" class="tab-content" style="display:none">
+        <div class="card">
+            <h3 style="margin-bottom:15px">Body Measurements (cm)</h3>
+            <div class="form-grid">
+                <div class="frow"><label>Height</label><input type="number" id="m_height"></div>
+                <div class="frow"><label>Weight</label><input type="number" id="m_weight"></div>
+                <div class="frow"><label>Bust</label><input type="number" id="m_bust"></div>
+                <div class="frow"><label>Waist</label><input type="number" id="m_waist"></div>
+                <div class="frow"><label>Hip</label><input type="number" id="m_hip"></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="text-align:right">
+        <button class="btn btn-primary" id="save-btn" onclick="saveToSupabase()">✦ Save to Cloud</button>
+    </div>
+</div>
+
+<div id="page-clients" class="page">
+    <h2 style="font-family:'Cormorant Garamond'; font-size:32px; margin-bottom:20px">Client Database</h2>
+    <div id="client-list" class="client-grid">
+        </div>
+</div>
+
+<script>
+// 1. Supabase Configuration
+const SUPABASE_URL = 'https://frusgaaunvmvtwmuesmm.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZydXNnYWF1bnZtdnR3bXVlc21tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NjI0MzcsImV4cCI6MjA5MDUzODQzN30.UvVURNDxmUvCv7Ukyz3m3zx4viCtGr7YBUEfb-7MCx0';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 2. Navigation Logic
+function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + pageId).classList.add('active');
+    if(pageId === 'clients') fetchClients();
+    
+    // Hide/Show Tabs based on page
+    document.getElementById('nav-tabs').style.display = (pageId === 'main') ? 'flex' : 'none';
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tabId).style.display = 'block';
+    event.currentTarget.classList.add('active');
+}
+
+// 3. Cloud Functions (Save & Load)
+async function saveToSupabase() {
+    const name = document.getElementById('c_name').value;
+    if(!name) return alert("Please enter Client Name");
+
+    const btn = document.getElementById('save-btn');
+    btn.textContent = "Syncing...";
+    btn.disabled = true;
+
+    const payload = {
+        name: name,
+        age: document.getElementById('c_age').value,
+        gender: document.getElementById('c_gender').value,
+        date: document.getElementById('c_date').value,
+        height: document.getElementById('m_height').value,
+        weight: document.getElementById('m_weight').value,
+        bust: document.getElementById('m_bust').value,
+        waist: document.getElementById('m_waist').value,
+        hip: document.getElementById('m_hip').value,
+        saved_at: new Date().toISOString()
+    };
+
+    const { error } = await _supabase.from('clients').upsert([payload], { onConflict: 'name' });
+
+    if(error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("✨ Data saved to Cloud successfully!");
+        showPage('clients');
+    }
+    btn.textContent = "✦ Save to Cloud";
+    btn.disabled = false;
+}
+
+async function fetchClients() {
+    const listDiv = document.getElementById('client-list');
+    listDiv.innerHTML = "Loading...";
+
+    const { data, error } = await _supabase.from('clients').select('*').order('saved_at', { ascending: false });
+
+    if(error) return listDiv.innerHTML = "Error loading data";
+    
+    if(data.length === 0) {
+        listDiv.innerHTML = "<p>No clients found.</p>";
+        return;
+    }
+
+    listDiv.innerHTML = data.map(c => `
+        <div class="client-card">
+            <span class="cc-del" onclick="deleteClient('${c.id}')">🗑️</span>
+            <div class="cc-name">${c.name}</div>
+            <div style="font-size:12px; color:#8A7A6A; margin-top:5px;">
+                ${c.gender} | Age: ${c.age || '-'} <br>
+                Last Sync: ${new Date(c.saved_at).toLocaleDateString()}
+            </div>
+        </div>
+    `).join('');
+}
+
+async function deleteClient(id) {
+    if(!confirm("Delete this client?")) return;
+    await _supabase.from('clients').delete().eq('id', id);
+    fetchClients();
+}
+
+// Initial setup
+window.onload = () => {
+    document.getElementById('c_date').valueAsDate = new Date();
+};
+</script>
+
+</body>
+</html>
