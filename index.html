@@ -3782,35 +3782,14 @@ async function _doSave(scriptUrl) {
     const values  = SHEET_COLUMNS.map(c => row[c.key] ?? '');
     const payload = JSON.stringify({ headers, values });
 
-    // Apps Script requires a redirect-following POST from a form to avoid CORS block
-    // We create a hidden iframe + form, submit into the iframe (fire-and-forget)
-    const iframeId = 'gs_submit_frame_' + Date.now();
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeId;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
+    // Use fetch with no-cors — Apps Script will receive and process
+    // Response body not readable but data saves successfully
+    fetch(scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: payload
+    });
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = scriptUrl;
-    form.target = iframeId;
-    form.style.display = 'none';
-
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = payload;
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
-
-    // Clean up after short delay
-    setTimeout(() => {
-      document.body.removeChild(form);
-      document.body.removeChild(iframe);
-    }, 5000);
-
-    // Show success immediately (fire-and-forget — no CORS response needed)
     btn.innerHTML = '✅ Saved!';
     btn.style.background = 'rgba(52,168,83,.35)';
     setTimeout(() => {
@@ -3823,7 +3802,7 @@ async function _doSave(scriptUrl) {
     btn.innerHTML = '❌ Failed';
     btn.disabled = false;
     setTimeout(() => { btn.innerHTML = origText; btn.disabled = false; }, 2500);
-    alert('Save failed: ' + err.message + '\n\nPlease check your Apps Script URL in ⚙ Sheet Setup.');
+    alert('Save failed: ' + err.message);
   }
 }
 
@@ -4416,32 +4395,15 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="position:relative">
           <pre id="appsScriptCode" style="background:#1A1A1A;color:#a8f0b8;font-family:'DM Mono',monospace;font-size:11px;padding:14px 16px;border-radius:10px;overflow-x:auto;line-height:1.6;margin:0;white-space:pre-wrap">function doPost(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('IMAGE INTELLIGENCE · Database');
+    if (!sheet) sheet = ss.getSheets()[0];
 
-    // รับข้อมูลจาก form parameter (วิธีนี้ทำงานได้จาก local HTML file)
-    var raw  = e.parameter.payload || e.postData.contents;
-    var data = JSON.parse(raw);
-    var headers = data.headers;
-    var values  = data.values;
+    var raw    = e.postData.contents;
+    var data   = JSON.parse(raw);
+    var values = data.values;
 
-    // Create header row if sheet is empty
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(headers);
-      sheet.getRange(1, 1, 1, headers.length)
-        .setBackground('#3D1525')
-        .setFontColor('#C4A24A')
-        .setFontWeight('bold')
-        .setFontSize(10);
-      sheet.setFrozenRows(1);
-    }
-
-    // Append client data row
     sheet.appendRow(values);
-
-    // Auto-resize columns on every 10th row
-    if (sheet.getLastRow() % 10 === 0) {
-      sheet.autoResizeColumns(1, headers.length);
-    }
 
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'ok', row: sheet.getLastRow() }))
@@ -4456,7 +4418,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function doGet(e) {
   return ContentService
-    .createTextOutput(JSON.stringify({ status: 'ready', message: 'IMAGE INTELLIGENCE DB ready' }))
+    .createTextOutput(JSON.stringify({ status: 'ready' }))
     .setMimeType(ContentService.MimeType.JSON);
 }</pre>
           <button onclick="copyAppsScript()" style="position:absolute;top:8px;right:8px;background:rgba(196,162,74,.2);border:1px solid rgba(196,162,74,.4);color:#C4A24A;font-size:10px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Mono',monospace">Copy</button>
