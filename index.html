@@ -3780,15 +3780,22 @@ async function _doSave(scriptUrl) {
     const row = collectSheetRow();
     const headers = SHEET_COLUMNS.map(c => c.label);
     const values  = SHEET_COLUMNS.map(c => row[c.key] ?? '');
+    
+    // เตรียม Payload ในรูปแบบ JSON
     const payload = JSON.stringify({ headers, values });
 
-    // Send via GET with encoded payload — works from GitHub Pages → Apps Script
-    const encodedPayload = encodeURIComponent(payload);
-    const urlWithData = scriptUrl + '?data=' + encodedPayload;
-    fetch(urlWithData, { method: 'GET', mode: 'no-cors' });
+    // เปลี่ยนจาก GET เป็น POST เพื่อความเสถียรและรองรับข้อมูลจำนวนมาก
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors', // ใช้ no-cors เพื่อให้ส่งผ่านจาก GitHub ไปยัง Google ได้ง่ายที่สุด
+      body: payload
+    });
 
+    // เนื่องจากใช้ no-cors เราจะไม่สามารถอ่าน JSON response ได้ 
+    // แต่เราสามารถสันนิษฐานได้ว่าถ้า fetch ไม่ throw error แสดงว่าส่งออกไปสำเร็จ
     btn.innerHTML = '✅ Saved!';
     btn.style.background = 'rgba(52,168,83,.35)';
+
     setTimeout(() => {
       btn.innerHTML = origText;
       btn.style.background = 'rgba(52,168,83,.18)';
@@ -3798,14 +3805,18 @@ async function _doSave(scriptUrl) {
   } catch (err) {
     btn.innerHTML = '❌ Failed';
     btn.disabled = false;
-    setTimeout(() => { btn.innerHTML = origText; btn.disabled = false; }, 2500);
-    alert('Save failed: ' + err.message);
+    console.error('Save error:', err);
+    alert('Save failed: ' + err.toString());
+    setTimeout(() => { 
+      btn.innerHTML = origText; 
+      btn.disabled = false; 
+    }, 2500);
   }
 }
 
 function saveSheetConfig() {
   const url = document.getElementById('sheetUrlInput').value.trim();
-  if (!url.startsWith('https://script.google.com')) {
+  if (!url || !url.startsWith('https://script.google.com')) {
     alert('URL ไม่ถูกต้อง — ต้องขึ้นต้นด้วย https://script.google.com');
     return;
   }
@@ -3820,12 +3831,13 @@ function clearSheetConfig() {
   alert('URL cleared. กด 🗄 Save to Sheet อีกครั้งเพื่อตั้งค่าใหม่');
 }
 
-// ── Populate URL field when modal opens ──────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('gsheet_script_url');
-  if (saved) document.getElementById('sheetUrlInput').value = saved;
+  if (saved) {
+    const input = document.getElementById('sheetUrlInput');
+    if (input) input.value = saved;
+  }
 });
-
 /* ══════════════════════════════════════════════════════════
    EXPORT / IMPORT
 ══════════════════════════════════════════════════════════ */
